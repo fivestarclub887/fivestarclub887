@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>オーディション投票</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--purple-50:#EEEDFE;--purple-600:#534AB7;--teal-50:#E1F5EE;--teal-600:#0F6E56;}
+.app{padding:1.5rem 1rem;max-width:700px;margin:0 auto}
+.header{margin-bottom:1.5rem;text-align:center}
+.header h1{font-size:22px;font-weight:500;color:#333;letter-spacing:-.3px}
+.header p{font-size:14px;color:#666;margin-top:4px}
+.tabs{display:flex;border:0.5px solid #ccc;border-radius:8px;overflow:hidden;margin-bottom:1.5rem;background:#f9f9f9}
+.tab{flex:1;padding:8px;font-size:13px;font-weight:500;background:transparent;border:none;cursor:pointer;color:#666;transition:all .15s}
+.tab.active{background:#fff;color:#333;border-radius:7px}
+.round-tabs{display:flex;gap:6px;margin-bottom:1.2rem;flex-wrap:wrap}
+.round-tab{padding:5px 14px;font-size:12px;font-weight:500;border:1.5px solid #ddd;border-radius:99px;background:#fff;cursor:pointer;color:#888;transition:all .15s}
+.round-tab.active{border-color:#534AB7;color:#534AB7;background:var(--purple-50)}
+.round-tab.voted-round{border-color:#0F6E56;color:#0F6E56;background:var(--teal-50)}
+.round-tab.voted-round.active{border-color:#0F6E56;background:var(--teal-50)}
+.view{display:none}.view.active{display:block}
+.candidate-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:1.5rem}
+.candidate-card{background:#fff;border:1.5px solid #eee;border-radius:12px;padding:1rem;cursor:pointer;transition:border-color .15s;user-select:none}
+.candidate-card:hover{border-color:#ccc}
+.candidate-card.selected{border-color:#534AB7;background:var(--purple-50)}
+.candidate-card.voted{pointer-events:none;opacity:.75}
+.candidate-num{font-size:11px;font-weight:500;color:#888;margin-bottom:6px;letter-spacing:.5px}
+.candidate-name{font-size:15px;font-weight:500;color:#333;margin-bottom:3px}
+.candidate-genre{font-size:12px;color:#666;margin-bottom:10px}
+
+/* YouTube埋め込み用スタイル */
+.yt-embed-wrap{position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;margin:8px 0 12px;background:#000}
+.yt-embed-wrap iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0}
+
+.radio-wrap{display:flex;align-items:center;gap:8px;margin-top:4px}
+.radio-btn{width:18px;height:18px;border-radius:50%;border:1.5px solid #ccc;background:#fff;flex-shrink:0;transition:all .15s}
+.candidate-card.selected .radio-btn{background:#534AB7;border-color:#534AB7;box-shadow:inset 0 0 0 3px #fff}
+.radio-label{font-size:12px;color:#666}
+.candidate-card.selected .radio-label{color:#534AB7;font-weight:500}
+.vote-bar{background:#fff;border:0.5px solid #eee;border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px;display:flex;align-items:center;gap:16px}
+.vote-btn{flex-shrink:0;padding:10px 28px;background:#534AB7;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.vote-btn:hover{opacity:.85}.vote-btn:disabled{opacity:.4;cursor:not-allowed}
+.selection-hint{font-size:13px;color:#666}
+.selection-hint strong{color:#333;font-weight:500}
+.voted-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:#0F6E56;background:#E1F5EE;padding:6px 14px;border-radius:8px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.5rem}
+.stat-card{background:#f9f9f9;border-radius:8px;padding:.75rem 1rem;text-align:center}
+.stat-label{font-size:11px;color:#666;margin-bottom:4px;letter-spacing:.3px}
+.stat-val{font-size:20px;font-weight:500;color:#333}
+.results-list{display:flex;flex-direction:column;gap:10px}
+.result-row{background:#fff;border:0.5px solid #eee;border-radius:12px;padding:.875rem 1.25rem}
+.result-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.rank-badge{width:28px;height:28px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#666;flex-shrink:0}
+.rank-badge.gold{background:#FAC775;color:#633806}.rank-badge.silver{background:#D3D1C7;color:#444441}.rank-badge.bronze{background:#F5C4B3;color:#712B13}
+.result-name{font-size:14px;font-weight:500;color:#333;flex:1}
+.result-pct{font-size:13px;font-weight:500;color:#534AB7;min-width:36px;text-align:right}
+.bar-track{height:5px;background:#f5f5f5;border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:#534AB7;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.notice{font-size:12px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.notice.info{background:#eef6ff;color:#0052cc}
+.notice.success{background:#E1F5EE;color:#0F6E56}
+.notice.warn{background:#FAEEDA;color:#854F0B}
+.notice.error{background:#FCEBEB;color:#A32D2D}
+.sync-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:99px;background:#f0f0f0;color:#666;margin-left:8px;vertical-align:middle}
+.sync-badge.live{background:#E1F5EE;color:#0F6E56}
+.sync-badge.error{background:#FCEBEB;color:#A32D2D}
+.loading-overlay{text-align:center;padding:3rem 1rem;color:#888;font-size:14px}
+.no-audio{width:100%;padding:7px 10px;border:0.5px dashed #ddd;border-radius:8px;font-size:12px;color:#bbb;text-align:center;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>オーディション投票 <span class="sync-badge" id="sync-badge">接続中...</span></h1>
+    <p>動画で内容を確認して、各回1名に投票してください</p>
+  </div>
+  <div id="global-notice"></div>
+  <div class="tabs">
+    <button class="tab active" data-tab="vote" onclick="switchTab('vote')">投票する</button>
+    <button class="tab" data-tab="results" onclick="switchTab('results')">集計結果</button>
+  </div>
+
+  <div id="view-vote" class="view active">
+    <div id="vote-loading" class="loading-overlay">データを読み込み中…</div>
+    <div id="vote-content" style="display:none">
+      <div class="round-tabs" id="vote-round-tabs"></div>
+      <div class="candidate-grid" id="candidate-grid"></div>
+      <div class="vote-bar">
+        <div style="flex:1" id="vote-hint"></div>
+        <button class="vote-btn" id="vote-btn" onclick="castVote()" disabled>投票する</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-results" class="view">
+    <div class="round-tabs" id="results-round-tabs"></div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">候補者数</div><div class="stat-val" id="stat-candidates">—</div></div>
+      <div class="stat-card"><div class="stat-label">トップ得票率</div><div class="stat-val" id="stat-top">—</div></div>
+      <div class="stat-card"><div class="stat-label">表示内容</div><div class="stat-val">%</div></div>
+    </div>
+    <div class="results-list" id="results-list"><div class="loading-overlay">読み込み中…</div></div>
+    <p style="font-size:11px;color:#888;margin-top:10px;text-align:right" id="last-updated"></p>
+  </div>
+</div>
+
+<script>
+// =========================================================
+// 共通設定
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzIBW04C8wKAxNBWubZ1gPoeJ0slTFxSB5u0u0OkLzu1awYdOYHnMYWP0zs_6vRUcQ8/exec';
+// =========================================================
+
+const VOTED_KEY_PREFIX = 'audition-vote-v3-round-';
+
+let state = {
+  rounds: [],
+  currentVoteRound: null,
+  currentResultRound: null,
+  perRound: {},
+};
+
+function getRoundState(roundId){
+  if(!state.perRound[roundId]){
+    state.perRound[roundId] = { selected:null, voted:false, votedId:null };
+    loadMyVote(roundId);
+  }
+  return state.perRound[roundId];
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escAttr(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
+async function fetchGAS(payload){
+  setSyncBadge('通信中...', false);
+  try {
+    const res = await fetch(GAS_URL, { method:'POST', body:JSON.stringify(payload) });
+    const json = await res.json();
+    setSyncBadge('同期完了', true);
+    return json;
+  } catch(e){
+    console.error(e);
+    setSyncBadge('通信エラー', false, true);
+    showNotice('サーバー通信に失敗しました。', 'error');
+    return null;
+  }
+}
+
+async function loadData(){
+  const response = await fetchGAS({ action:'get' });
+  if(!response) return;
+
+  if(Array.isArray(response)){
+    if(state.rounds.length === 0){
+      state.rounds = [{ id:'round_legacy', name:'第1回', candidates: response }];
+    } else {
+      const r = state.rounds.find(r=>r.id==='round_legacy');
+      if(r){ r.candidates = response; }
+    }
+  } else if(response && Array.isArray(response.rounds)){
+    state.rounds = response.rounds;
+  }
+
+  if(state.rounds.length > 0){
+    if(!state.currentVoteRound || !state.rounds.find(r=>r.id===state.currentVoteRound))
+      state.currentVoteRound = state.rounds[0].id;
+    if(!state.currentResultRound || !state.rounds.find(r=>r.id===state.currentResultRound))
+      state.currentResultRound = state.rounds[0].id;
+  }
+
+  document.getElementById('vote-loading').style.display = 'none';
+  document.getElementById('vote-content').style.display = 'block';
+  renderRoundTabs('vote');
+  renderRoundTabs('results');
+  renderVote();
+  renderResults();
+}
+
+function loadMyVote(roundId){
+  try {
+    const raw = localStorage.getItem(VOTED_KEY_PREFIX+roundId);
+    if(raw){ const rs=state.perRound[roundId]; rs.voted=true; rs.votedId=JSON.parse(raw); rs.selected=rs.votedId; }
+  } catch(e){}
+}
+function saveMyVote(roundId, id){ try{ localStorage.setItem(VOTED_KEY_PREFIX+roundId, JSON.stringify(id)); }catch(e){} }
+
+function setSyncBadge(text, isLive, isError=false){
+  const b=document.getElementById('sync-badge');
+  b.className='sync-badge'+(isLive?' live':'')+(isError?' error':'');
+  b.textContent=text;
+}
+function showNotice(msg, type='info'){
+  const el=document.getElementById('global-notice');
+  el.innerHTML=`<div class="notice ${type}">${esc(msg)}</div>`;
+  setTimeout(()=>{ el.innerHTML=''; }, 4500);
+}
+function updateLastUpdated(){
+  const el=document.getElementById('last-updated');
+  if(el) el.textContent='最終更新: '+new Date().toLocaleTimeString('ja-JP');
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if(name==='results'){ renderRoundTabs('results'); renderResults(); loadData(); }
+  if(name==='vote'){ renderRoundTabs('vote'); renderVote(); }
+}
+
+function renderRoundTabs(context){
+  const container = document.getElementById(context+'-round-tabs');
+  if(!container) return;
+  container.innerHTML = '';
+  if(state.rounds.length <= 1){
+    if(state.rounds.length===1){
+      if(context==='vote') state.currentVoteRound=state.rounds[0].id;
+      else state.currentResultRound=state.rounds[0].id;
+    }
+    return;
+  }
+  const currentId = context==='vote' ? state.currentVoteRound : state.currentResultRound;
+  state.rounds.forEach(r=>{
+    const rs = getRoundState(r.id);
+    const btn = document.createElement('button');
+    let cls = 'round-tab';
+    if(r.id===currentId) cls+=' active';
+    if(rs.voted) cls+=' voted-round';
+    btn.className=cls;
+    btn.textContent=r.name+(rs.voted?' ✓':'');
+    btn.onclick=()=>{
+      if(context==='vote'){ state.currentVoteRound=r.id; renderRoundTabs('vote'); renderVote(); }
+      else{ state.currentResultRound=r.id; renderRoundTabs('results'); renderResults(); }
+    };
+    container.appendChild(btn);
+  });
+}
+
+function renderVote(){
+  const roundId = state.currentVoteRound;
+  const round = state.rounds.find(r=>r.id===roundId);
+  const grid = document.getElementById('candidate-grid');
+  grid.innerHTML='';
+  if(!round){ grid.innerHTML='<p style="color:#888;font-size:14px;grid-column:1/-1">ラウンドがありません</p>'; updateVoteHint(null,null); return; }
+  const rs = getRoundState(roundId);
+  if(!round.candidates.length){ grid.innerHTML='<p style="color:#888;font-size:14px;grid-column:1/-1">候補者が登録されていません</p>'; updateVoteHint(roundId,rs); return; }
+
+  round.candidates.forEach((c,idx)=>{
+    const card = document.createElement('div');
+    card.className='candidate-card'+(rs.selected===c.id?' selected':'')+(rs.voted?' voted':'');
+    card.onclick=()=>selectCandidate(roundId, c.id);
+    
+    // c.audioUrl には管理画面で変換した embed (埋め込み) URLが入っている想定
+    const linkUrl = c.audioUrl || c.driveShareUrl;
+    let linkHtml = `<div class="no-audio" style="margin: 8px 0 12px;">動画なし</div>`;
+    
+    if (linkUrl) {
+      if (linkUrl.includes('youtube.com/embed/')) {
+        // YouTubeの埋め込みプレーヤーを表示
+        linkHtml = `
+          <div class="yt-embed-wrap">
+            <iframe src="${escAttr(linkUrl)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+          </div>`;
+      } else {
+        // 通常のリンク（万が一YouTube以外のURLだった場合のフォールバック）
+        linkHtml = `
+          <a href="${escAttr(linkUrl)}" target="_blank" rel="noopener noreferrer" style="display: flex; justify-content: center; align-items: center; gap: 6px; margin: 8px 0 12px; padding: 8px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; color: #333; text-decoration: none; transition: background 0.15s;" onclick="event.stopPropagation()" onmouseover="this.style.background='#ebebeb'" onmouseout="this.style.background='#f5f5f5'">
+            🔗 YouTubeで開く
+          </a>`;
+      }
+    }
+
+    card.innerHTML=`
+      <div class="candidate-num">No.${idx+1}</div>
+      <div class="candidate-name">${esc(c.name)}</div>
+      <div class="candidate-genre">${esc(c.genre)}</div>
+      ${linkHtml}
+      <div class="radio-wrap">
+        <div class="radio-btn"></div>
+        <span class="radio-label">${rs.voted&&rs.selected===c.id?'✓ あなたの票':(rs.voted?'':'この候補者に投票')}</span>
+      </div>`;
+    grid.appendChild(card);
+  });
+  updateVoteHint(roundId, rs);
+}
+
+function selectCandidate(roundId, id){
+  const rs=getRoundState(roundId);
+  if(rs.voted) return;
+  rs.selected=rs.selected===id?null:id;
+  renderVote();
+}
+
+function updateVoteHint(roundId, rs){
+  const hint=document.getElementById('vote-hint');
+  const btn=document.getElementById('vote-btn');
+  if(!roundId||!rs){ hint.innerHTML='<span class="selection-hint">ラウンドを選択してください</span>'; btn.disabled=true; return; }
+  if(rs.voted){
+    const round=state.rounds.find(r=>r.id===roundId);
+    const name=round?.candidates.find(c=>c.id===rs.selected)?.name||'';
+    hint.innerHTML=`<span class="voted-badge">「${esc(name)}」に投票しました</span>`;
+    btn.disabled=true; btn.textContent='投票済み';
+  } else if(rs.selected){
+    const round=state.rounds.find(r=>r.id===roundId);
+    const name=round?.candidates.find(c=>c.id===rs.selected)?.name||'';
+    hint.innerHTML=`<span class="selection-hint">選択中: <strong>${esc(name)}</strong></span>`;
+    btn.disabled=false; btn.textContent='投票する';
+  } else {
+    hint.innerHTML='<span class="selection-hint">候補者のカードをタップして選んでください</span>';
+    btn.disabled=true; btn.textContent='投票する';
+  }
+}
+
+async function castVote(){
+  const roundId=state.currentVoteRound;
+  const rs=getRoundState(roundId);
+  if(!rs.selected||rs.voted) return;
+  const votedId=rs.selected;
+  const round=state.rounds.find(r=>r.id===roundId);
+
+  const res=await fetchGAS({ action:'vote', id:votedId, roundId:roundId });
+
+  if(res&&res.success){
+    rs.voted=true;
+    rs.votedId=votedId;
+    saveMyVote(roundId, votedId);
+
+    if(round){
+      round.candidates=res.data;
+    }
+
+    renderVote();
+    renderRoundTabs('vote');
+  } else {
+    showNotice('投票に失敗しました','error');
+  }
+}
+
+function renderResults(){
+  const roundId=state.currentResultRound;
+  const round=state.rounds.find(r=>r.id===roundId);
+  const list=document.getElementById('results-list');
+  if(!round){ list.innerHTML='<div class="loading-overlay">ラウンドがありません</div>'; document.getElementById('stat-candidates').textContent='—'; document.getElementById('stat-top').textContent='—'; return; }
+  const total=round.candidates.reduce((s,c)=>s+Number(c.votes||0),0);
+  const sorted=[...round.candidates].sort((a,b)=>Number(b.votes||0)-Number(a.votes||0));
+  document.getElementById('stat-candidates').textContent=round.candidates.length;
+  const top=sorted[0];
+  document.getElementById('stat-top').textContent=total>0&&top?Math.round(Number(top.votes||0)/total*100)+'%':'—';
+  list.innerHTML='';
+  sorted.forEach((c,i)=>{
+    const pct=total>0?Math.round(Number(c.votes||0)/total*100):0;
+    const rankClass=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const row=document.createElement('div');
+    row.className='result-row';
+    row.innerHTML=`
+      <div class="result-header">
+        <div class="rank-badge ${rankClass}">${i+1}</div>
+        <div class="result-name">${esc(c.name)}<br><span style="font-size:11px;color:#888;font-weight:400">${esc(c.genre)}</span></div>
+        <div class="result-pct">${pct}%</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="bar-${roundId}-${c.id}" style="width:0%"></div></div>`;
+    list.appendChild(row);
+    setTimeout(()=>{ const b=document.getElementById('bar-'+roundId+'-'+c.id); if(b) b.style.width=pct+'%'; }, 80);
+  });
+  updateLastUpdated();
+}
+
+loadData();
+setInterval(()=>{
+  loadData();
+}, 15000);
+</script>
+</body>
+</html>
