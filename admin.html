@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理画面 - オーディション投票</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--purple-50:#EEEDFE;--purple-600:#534AB7;--teal-50:#E1F5EE;--teal-600:#0F6E56;}
+body{background:#f5f5f5;min-height:100vh}
+
+/* ===== ロック画面 ===== */
+.lock-screen{position:fixed;inset:0;background:#1a1a2e;display:flex;align-items:center;justify-content:center;z-index:9999}
+.lock-box{background:#fff;border-radius:16px;padding:2.5rem 2rem;width:100%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.lock-icon{font-size:40px;margin-bottom:1rem}
+.lock-box h2{font-size:18px;font-weight:600;color:#333;margin-bottom:4px}
+.lock-box p{font-size:13px;color:#888;margin-bottom:1.5rem}
+.lock-input{width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:10px;font-size:15px;letter-spacing:2px;text-align:center;outline:none;transition:border-color .15s;margin-bottom:12px}
+.lock-input:focus{border-color:#534AB7}
+.lock-input.error{border-color:#A32D2D;animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.lock-btn{width:100%;padding:11px;background:#534AB7;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.lock-btn:hover{opacity:.85}
+.lock-error{font-size:12px;color:#A32D2D;margin-top:8px;min-height:18px}
+
+/* ===== メイン ===== */
+.app{padding:1.5rem 1rem;max-width:760px;margin:0 auto;display:none}
+.header{margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.header-left h1{font-size:20px;font-weight:600;color:#333}
+.header-left p{font-size:13px;color:#888;margin-top:2px}
+.header-right{display:flex;align-items:center;gap:8px}
+.sync-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 8px;border-radius:99px;background:#f0f0f0;color:#666}
+.sync-badge.live{background:#E1F5EE;color:#0F6E56}
+.sync-badge.error{background:#FCEBEB;color:#A32D2D}
+.logout-btn{padding:6px 14px;background:#fff;border:0.5px solid #ccc;border-radius:8px;font-size:12px;cursor:pointer;color:#666}
+.logout-btn:hover{background:#f5f5f5}
+
+.tabs{display:flex;border:0.5px solid #ccc;border-radius:8px;overflow:hidden;margin-bottom:1.5rem;background:#f9f9f9}
+.tab{flex:1;padding:8px;font-size:13px;font-weight:500;background:transparent;border:none;cursor:pointer;color:#666;transition:all .15s}
+.tab.active{background:#fff;color:#333;border-radius:7px}
+.round-tabs{display:flex;gap:6px;margin-bottom:1.2rem;flex-wrap:wrap}
+.round-tab{padding:5px 14px;font-size:12px;font-weight:500;border:1.5px solid #ddd;border-radius:99px;background:#fff;cursor:pointer;color:#888;transition:all .15s}
+.round-tab.active{border-color:#534AB7;color:#534AB7;background:var(--purple-50)}
+.view{display:none}.view.active{display:block}
+
+/* 集計 */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1.5rem}
+.stat-card{background:#f9f9f9;border-radius:8px;padding:.75rem 1rem;text-align:center}
+.stat-label{font-size:11px;color:#666;margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:500;color:#333}
+.results-list{display:flex;flex-direction:column;gap:10px}
+.result-row{background:#fff;border:0.5px solid #eee;border-radius:12px;padding:.875rem 1.25rem}
+.result-header{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.rank-badge{width:28px;height:28px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;color:#666;flex-shrink:0}
+.rank-badge.gold{background:#FAC775;color:#633806}.rank-badge.silver{background:#D3D1C7;color:#444441}.rank-badge.bronze{background:#F5C4B3;color:#712B13}
+.result-name{font-size:14px;font-weight:500;color:#333;flex:1}
+.result-pct{font-size:13px;font-weight:500;color:#534AB7;min-width:36px;text-align:right}
+.bar-track{height:5px;background:#f5f5f5;border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:#534AB7;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+/* 管理 */
+.admin-section{background:#fff;border:0.5px solid #eee;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.admin-section h3{font-size:11px;font-weight:600;color:#888;margin-bottom:10px;letter-spacing:.5px;text-transform:uppercase}
+.admin-row{display:flex;gap:8px;flex-wrap:wrap}
+.admin-input{flex:1;min-width:100px;padding:8px 10px;border:0.5px solid #ccc;border-radius:8px;font-size:13px;background:#fff;color:#333}
+.admin-btn{padding:8px 16px;background:#fff;border:0.5px solid #ccc;border-radius:8px;font-size:13px;cursor:pointer;color:#333;white-space:nowrap}
+.admin-btn:hover{background:#f5f5f5}
+.admin-btn.danger{color:#A32D2D;border-color:#F09595}
+.admin-btn.primary{background:#534AB7;color:#fff;border-color:#534AB7}
+.admin-btn.primary:hover{opacity:.85;background:#534AB7}
+.admin-round-select{padding:6px 10px;border:0.5px solid #ccc;border-radius:8px;font-size:13px;background:#fff;color:#333;cursor:pointer}
+.candidate-list-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #eee}
+.candidate-list-item:last-child{border-bottom:none}
+.delete-btn{background:none;border:none;cursor:pointer;color:#bbb;padding:4px;font-size:16px}
+.delete-btn:hover{color:#A32D2D}
+.notice{font-size:12px;padding:8px 12px;border-radius:8px;display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.notice.info{background:#eef6ff;color:#0052cc}
+.notice.success{background:#E1F5EE;color:#0F6E56}
+.notice.warn{background:#FAEEDA;color:#854F0B}
+.notice.error{background:#FCEBEB;color:#A32D2D}
+.loading-overlay{text-align:center;padding:2rem 1rem;color:#888;font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="lock-screen" id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-icon">🔐</div>
+    <h2>管理者専用ページ</h2>
+    <p>パスワードを入力してください</p>
+    <input class="lock-input" id="lock-input" type="password" placeholder="••••••••••"
+      onkeydown="if(event.key==='Enter') unlock()" autocomplete="current-password" />
+    <button class="lock-btn" onclick="unlock()">ログイン</button>
+    <div class="lock-error" id="lock-error"></div>
+  </div>
+</div>
+
+<div class="app" id="main-app" style="display:none">
+  <div class="header">
+    <div class="header-left">
+      <h1>🎛️ 管理画面</h1>
+      <p>オーディション投票システム</p>
+    </div>
+    <div class="header-right">
+      <span class="sync-badge" id="sync-badge">接続中...</span>
+      <button class="logout-btn" onclick="lockScreen()">ログアウト</button>
+    </div>
+  </div>
+
+  <div id="global-notice"></div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="manage" onclick="switchTab('manage')">候補者・音源管理</button>
+    <button class="tab" data-tab="results" onclick="switchTab('results')">集計結果</button>
+  </div>
+
+  <div id="view-manage" class="view active">
+
+    <div class="admin-section">
+      <h3>ラウンド（回）管理</h3>
+      <div class="admin-row" style="margin-bottom:8px">
+        <input class="admin-input" id="new-round-name" placeholder="例: 第1回予選" style="max-width:220px"/>
+        <button class="admin-btn primary" onclick="addRound()">＋ ラウンド追加</button>
+      </div>
+      <div id="admin-round-list"></div>
+    </div>
+
+    <div class="admin-section">
+      <h3>操作対象ラウンド</h3>
+      <select class="admin-round-select" id="admin-round-select" onchange="onAdminRoundChange()">
+        <option value="">— ラウンドを選択 —</option>
+      </select>
+    </div>
+
+    <div id="admin-round-content" style="display:none">
+      <div class="admin-section">
+        <h3>候補者を追加</h3>
+        <div class="admin-row">
+          <input class="admin-input" id="new-name" placeholder="アーティスト名" />
+          <input class="admin-input" id="new-genre" placeholder="ジャンル（任意）" style="max-width:130px"/>
+          <button class="admin-btn" onclick="addCandidate()">追加</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3>現在の候補者</h3>
+        <div id="admin-candidate-list"></div>
+      </div>
+
+      <div class="admin-section">
+        <h3>動画管理（YouTube URL）</h3>
+        <div class="notice info" style="margin-bottom:10px; display:block;">
+          ① YouTubeに動画を<strong>「限定公開」</strong>でアップロード<br>
+          ② その動画のURL（共有リンクなど）を貼り付けて保存<br>
+          <span style="color:#A32D2D; font-size:11px; margin-top:4px; display:inline-block;">※「非公開」設定では他の人が再生できません。「限定公開」にしてください。</span>
+        </div>
+        <div id="admin-audio-list"></div>
+      </div>
+
+      <div class="admin-section">
+        <h3>データ操作</h3>
+        <div class="admin-row">
+          <button class="admin-btn danger" onclick="resetVotesSystem()">投票数をリセット</button>
+          <button class="admin-btn danger" onclick="deleteRound()">このラウンドを削除</button>
+          <button class="admin-btn" onclick="exportCSV()">CSVで出力</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-results" class="view">
+    <div class="round-tabs" id="results-round-tabs"></div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">候補者数</div><div class="stat-val" id="stat-candidates">—</div></div>
+      <div class="stat-card"><div class="stat-label">トップ得票率</div><div class="stat-val" id="stat-top">—</div></div>
+      <div class="stat-card"><div class="stat-label">表示内容</div><div class="stat-val">%</div></div>
+    </div>
+    <div class="results-list" id="results-list"><div class="loading-overlay">読み込み中…</div></div>
+    <p style="font-size:11px;color:#888;margin-top:10px;text-align:right" id="last-updated"></p>
+  </div>
+</div>
+
+<script>
+// =========================================================
+// 設定（index.html と同じGAS_URLを使う → データ共有）
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzIBW04C8wKAxNBWubZ1gPoeJ0slTFxSB5u0u0OkLzu1awYdOYHnMYWP0zs_6vRUcQ8/exec';
+const ADMIN_PW_HASH = '21dc116893d7e23343ec55125b7a004c44776873f4acb094a323fc09d7e23fb7'; // rajikawa887
+const ADMIN_SESSION_KEY = 'audition-admin-session-v1';
+// =========================================================
+
+let state = {
+  rounds: [],
+  currentResultRound: null,
+  adminRound: null,
+};
+
+// ===== ロック画面 =====
+async function sha256Hex(text){
+  const bytes = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function unlock(){
+  const input = document.getElementById('lock-input');
+  const errEl = document.getElementById('lock-error');
+  const hash = await sha256Hex(input.value);
+  if(hash !== ADMIN_PW_HASH){
+    input.classList.add('error');
+    errEl.textContent = 'パスワードが違います';
+    setTimeout(()=>{ input.classList.remove('error'); input.value=''; }, 600);
+    return;
+  }
+  sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+  loadData();
+}
+
+function lockScreen(){
+  sessionStorage.removeItem(ADMIN_SESSION_KEY);
+  document.getElementById('lock-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+  document.getElementById('lock-input').value = '';
+  document.getElementById('lock-error').textContent = '';
+}
+
+// セッション維持チェック
+if(sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true'){
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'block';
+}
+
+// ===== ユーティリティ =====
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function escAttr(s){ return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
+
+function setSyncBadge(text, isLive, isError=false){
+  const b=document.getElementById('sync-badge');
+  b.className='sync-badge'+(isLive?' live':'')+(isError?' error':'');
+  b.textContent=text;
+}
+function showNotice(msg, type='info'){
+  const el=document.getElementById('global-notice');
+  el.innerHTML=`<div class="notice ${type}">${esc(msg)}</div>`;
+  setTimeout(()=>{ el.innerHTML=''; }, 5000);
+}
+function updateLastUpdated(){
+  const el=document.getElementById('last-updated');
+  if(el) el.textContent='最終更新: '+new Date().toLocaleTimeString('ja-JP');
+}
+
+// ===== GAS通信 =====
+async function fetchGAS(payload){
+  setSyncBadge('通信中...', false);
+  try {
+    const res = await fetch(GAS_URL, { method:'POST', body:JSON.stringify(payload) });
+    const json = await res.json();
+    setSyncBadge('同期完了', true);
+    return json;
+  } catch(e){
+    console.error(e);
+    setSyncBadge('通信エラー', false, true);
+    showNotice('サーバー通信に失敗しました。', 'error');
+    return null;
+  }
+}
+
+// ===== データロード =====
+async function loadData(){
+  const response = await fetchGAS({ action:'get' });
+  if(!response) return;
+
+  if(Array.isArray(response)){
+    if(state.rounds.length===0) state.rounds=[{ id:'round_legacy', name:'第1回', candidates:response }];
+    else { const r=state.rounds.find(r=>r.id==='round_legacy'); if(r) r.candidates=response; }
+  } else if(response && Array.isArray(response.rounds)){
+    state.rounds = response.rounds;
+  }
+
+  if(state.rounds.length>0){
+    if(!state.currentResultRound || !state.rounds.find(r=>r.id===state.currentResultRound))
+      state.currentResultRound = state.rounds[0].id;
+  }
+  renderAdmin();
+  renderResultsTabs();
+  renderResults();
+}
+
+// ===== タブ切り替え =====
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if(name==='results'){ renderResultsTabs(); renderResults(); loadData(); }
+  if(name==='manage') renderAdmin();
+}
+
+// ===== 集計画面 =====
+function renderResultsTabs(){
+  const container=document.getElementById('results-round-tabs');
+  if(!container) return;
+  container.innerHTML='';
+  if(state.rounds.length<=1){
+    if(state.rounds.length===1) state.currentResultRound=state.rounds[0].id;
+    return;
+  }
+  state.rounds.forEach(r=>{
+    const btn=document.createElement('button');
+    btn.className='round-tab'+(r.id===state.currentResultRound?' active':'');
+    btn.textContent=r.name;
+    btn.onclick=()=>{ state.currentResultRound=r.id; renderResultsTabs(); renderResults(); };
+    container.appendChild(btn);
+  });
+}
+
+function renderResults(){
+  const roundId=state.currentResultRound;
+  const round=state.rounds.find(r=>r.id===roundId);
+  const list=document.getElementById('results-list');
+  if(!round){ list.innerHTML='<div class="loading-overlay">ラウンドがありません</div>'; document.getElementById('stat-candidates').textContent='—'; document.getElementById('stat-top').textContent='—'; return; }
+  const total=round.candidates.reduce((s,c)=>s+Number(c.votes||0),0);
+  const sorted=[...round.candidates].sort((a,b)=>Number(b.votes||0)-Number(a.votes||0));
+  document.getElementById('stat-candidates').textContent=round.candidates.length;
+  const top=sorted[0];
+  document.getElementById('stat-top').textContent=total>0&&top?Math.round(Number(top.votes||0)/total*100)+'%':'—';
+  list.innerHTML='';
+  sorted.forEach((c,i)=>{
+    const pct=total>0?Math.round(Number(c.votes||0)/total*100):0;
+    const rankClass=i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    const row=document.createElement('div');
+    row.className='result-row';
+    row.innerHTML=`
+      <div class="result-header">
+        <div class="rank-badge ${rankClass}">${i+1}</div>
+        <div class="result-name">${esc(c.name)}<br><span style="font-size:11px;color:#888;font-weight:400">${esc(c.genre)}</span></div>
+        <div class="result-pct">${pct}%</div>
+        <span style="font-size:12px;color:#888;margin-left:4px">${Number(c.votes||0)}票</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="bar-${roundId}-${c.id}" style="width:0%"></div></div>`;
+    list.appendChild(row);
+    setTimeout(()=>{ const b=document.getElementById('bar-'+roundId+'-'+c.id); if(b) b.style.width=pct+'%'; },80);
+  });
+  updateLastUpdated();
+}
+
+// ===== 管理画面描画 =====
+function renderAdmin(){
+  renderAdminRoundList();
+  renderAdminRoundSelect();
+  if(state.adminRound) renderAdminRoundContent();
+}
+
+function renderAdminRoundList(){
+  const container=document.getElementById('admin-round-list');
+  if(!state.rounds.length){ container.innerHTML='<p style="font-size:13px;color:#aaa">まだラウンドがありません</p>'; return; }
+  container.innerHTML=state.rounds.map(r=>`
+    <div class="candidate-list-item">
+      <input class="admin-input" id="edit-round-${r.id}" value="${escAttr(r.name)}" style="max-width:220px"/>
+      <button class="admin-btn" onclick="saveRoundName('${r.id}')">保存</button>
+      <span style="font-size:12px;color:#aaa">${r.candidates.length}名</span>
+    </div>`).join('');
+}
+
+function renderAdminRoundSelect(){
+  const sel=document.getElementById('admin-round-select');
+  const prev=sel.value;
+  sel.innerHTML='<option value="">— ラウンドを選択 —</option>';
+  state.rounds.forEach(r=>{
+    const opt=document.createElement('option');
+    opt.value=r.id; opt.textContent=r.name; sel.appendChild(opt);
+  });
+  if(state.adminRound) sel.value=state.adminRound;
+  else if(prev && state.rounds.find(r=>r.id===prev)){ sel.value=prev; state.adminRound=prev; }
+}
+
+function onAdminRoundChange(){
+  const sel=document.getElementById('admin-round-select');
+  state.adminRound=sel.value||null;
+  const content=document.getElementById('admin-round-content');
+  content.style.display=state.adminRound?'block':'none';
+  if(state.adminRound) renderAdminRoundContent();
+}
+
+function renderAdminRoundContent(){
+  renderAdminCandidateList();
+  renderAdminAudio();
+}
+
+function renderAdminCandidateList(){
+  const list=document.getElementById('admin-candidate-list');
+  const round=state.rounds.find(r=>r.id===state.adminRound);
+  if(!round){ list.innerHTML=''; return; }
+  if(!round.candidates.length){ list.innerHTML='<p style="font-size:13px;color:#aaa">候補者がいません</p>'; return; }
+  list.innerHTML=round.candidates.map(c=>`
+    <div class="candidate-list-item">
+      <input class="admin-input" id="edit-name-${c.id}" value="${escAttr(c.name)}" />
+      <input class="admin-input" id="edit-genre-${c.id}" value="${escAttr(c.genre)}" style="max-width:160px"/>
+      <span style="font-size:12px;color:#aaa;white-space:nowrap">${Number(c.votes||0)}票</span>
+      <button class="admin-btn" onclick="saveCandidate(${c.id})">保存</button>
+      <button class="delete-btn" onclick="removeCandidate(${c.id})" title="削除">✕</button>
+    </div>`).join('');
+}
+
+// YouTube URL変換 (動画IDを抽出して埋め込み用URLを生成)
+function convertYouTubeUrl(url){
+  if(!url) return '';
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  if(m) return 'https://www.youtube.com/embed/' + m[1];
+  return url;
+}
+
+function renderAdminAudio(){
+  const container=document.getElementById('admin-audio-list');
+  if(!container) return;
+  const round=state.rounds.find(r=>r.id===state.adminRound);
+  if(!round){ container.innerHTML=''; return; }
+  if(!round.candidates.length){ container.innerHTML='<p style="font-size:13px;color:#aaa">候補者がいません</p>'; return; }
+  container.innerHTML=round.candidates.map(c=>{
+    const hasAudio=!!c.audioUrl;
+    const displayUrl=c.driveShareUrl||(hasAudio?c.audioUrl:'');
+    return `<div class="candidate-list-item" style="flex-direction:column;align-items:stretch;gap:6px;padding:10px 0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:500;color:#333;flex:1">${esc(c.name)}</span>
+        ${hasAudio?`<span style="font-size:12px;color:#0F6E56">✓ 設定済み</span>`:`<span style="font-size:12px;color:#bbb">未設定</span>`}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="admin-input" id="audio-url-${c.id}"
+          placeholder="YouTubeのURLを貼り付け"
+          value="${escAttr(displayUrl)}"
+          style="font-size:12px;flex:1" />
+        <button class="admin-btn" onclick="saveAudioUrl(${c.id})" style="font-size:12px;padding:6px 12px;white-space:nowrap">保存</button>
+        ${hasAudio?`<button class="admin-btn danger" onclick="removeAudioUrl(${c.id})" style="font-size:12px;padding:6px 12px">削除</button>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== ラウンドCRUD =====
+async function addRound(){
+  const nameEl=document.getElementById('new-round-name');
+  const name=nameEl.value.trim();
+  if(!name){ showNotice('ラウンド名を入力してください','warn'); return; }
+  showNotice('追加中...','info');
+  const res=await fetchGAS({ action:'addRound', name:name });
+  if(res&&res.success&&res.rounds) state.rounds=res.rounds;
+  else { const newId='round_'+Date.now(); state.rounds.push({ id:newId, name:name, candidates:[] }); }
+  nameEl.value='';
+  showNotice('ラウンドを追加しました','success');
+  renderAdmin(); renderResultsTabs();
+}
+
+async function saveRoundName(roundId){
+  const el=document.getElementById('edit-round-'+roundId);
+  const name=el?el.value.trim():'';
+  if(!name){ showNotice('ラウンド名を入力してください','warn'); return; }
+  showNotice('保存中...','info');
+  const res=await fetchGAS({ action:'updateRound', roundId:roundId, name:name });
+  if(res&&res.success&&res.rounds) state.rounds=res.rounds;
+  else { const r=state.rounds.find(r=>r.id===roundId); if(r) r.name=name; }
+  showNotice('更新しました','success');
+  renderAdmin(); renderResultsTabs();
+}
+
+async function deleteRound(){
+  if(!state.adminRound) return;
+  if(!confirm('このラウンドを削除しますか？（元に戻せません）')) return;
+  const res=await fetchGAS({ action:'deleteRound', roundId:state.adminRound });
+  if(res&&res.success){
+    if(res.rounds) state.rounds=res.rounds;
+    else state.rounds=state.rounds.filter(r=>r.id!==state.adminRound);
+  } else {
+    state.rounds=state.rounds.filter(r=>r.id!==state.adminRound);
+  }
+  state.adminRound=null;
+  document.getElementById('admin-round-content').style.display='none';
+  showNotice('ラウンドを削除しました','success');
+  if(state.rounds.length>0) state.currentResultRound=state.rounds[0].id;
+  renderAdmin(); renderResultsTabs(); renderResults();
+}
+
+// ===== 候補者CRUD =====
+async function addCandidate(){
+  if(!state.adminRound) return;
+  const nameEl=document.getElementById('new-name');
+  const genreEl=document.getElementById('new-genre');
+  const name=nameEl.value.trim();
+  if(!name) return;
+  showNotice('保存中...','info');
+  const res=await fetchGAS({ action:'add', name:name, genre:genreEl.value.trim(), roundId:state.adminRound });
+  if(res&&res.success){ const round=state.rounds.find(r=>r.id===state.adminRound); if(round) round.candidates=res.data; nameEl.value=''; genreEl.value=''; showNotice(name+' を追加しました','success'); renderAdminRoundContent(); }
+}
+
+async function saveCandidate(id){
+  const name=document.getElementById('edit-name-'+id).value.trim();
+  const genre=document.getElementById('edit-genre-'+id).value.trim();
+  if(!name){ showNotice('候補者名を入力してください','warn'); return; }
+  showNotice('保存中...','info');
+  const res=await fetchGAS({ action:'update', id:id, name:name, genre:genre, roundId:state.adminRound });
+  if(res&&res.success){ const round=state.rounds.find(r=>r.id===state.adminRound); if(round) round.candidates=res.data; showNotice('更新しました','success'); renderAdminRoundContent(); }
+}
+
+async function removeCandidate(id){
+  if(!confirm('この候補者を削除しますか？')) return;
+  showNotice('削除中...','info');
+  const res=await fetchGAS({ action:'delete', id:id, roundId:state.adminRound });
+  if(res&&res.success){ const round=state.rounds.find(r=>r.id===state.adminRound); if(round) round.candidates=res.data; renderAdminRoundContent(); }
+}
+
+async function resetVotesSystem(){
+  if(!state.adminRound) return;
+  if(!confirm('このラウンドの全投票数をゼロにリセットしますか？')) return;
+  const res=await fetchGAS({ action:'resetVotes', roundId:state.adminRound });
+  if(res&&res.success){ const round=state.rounds.find(r=>r.id===state.adminRound); if(round) round.candidates=res.data; showNotice('投票数をリセットしました','success'); renderAdminRoundContent(); renderResults(); }
+}
+
+// ===== 音源URL管理 =====
+async function saveAudioUrl(candidateId){
+  const inputEl=document.getElementById('audio-url-'+candidateId);
+  const rawUrl=inputEl?inputEl.value.trim():'';
+  if(!rawUrl){ showNotice('URLを入力してください','warn'); return; }
+  
+  // YouTubeのURLを埋め込み(embed)URLに変換
+  const playUrl=convertYouTubeUrl(rawUrl);
+  
+  showNotice('保存中...','info');
+  const res=await fetchGAS({ action:'setAudioUrl', id:candidateId, roundId:state.adminRound, audioUrl:playUrl, driveShareUrl:rawUrl });
+  if(res&&res.success){
+    const round=state.rounds.find(r=>r.id===state.adminRound);
+    if(round) round.candidates=res.data;
+    showNotice('動画URLを保存しました','success');
+  } else {
+    const round=state.rounds.find(r=>r.id===state.adminRound);
+    if(round){ const c=round.candidates.find(c=>c.id===candidateId); if(c){ c.audioUrl=playUrl; c.driveShareUrl=rawUrl; } }
+    showNotice('ローカルに反映しました（GASが未対応の場合はスプレッドシートも更新してください）','warn');
+  }
+  renderAdminAudio();
+}
+
+async function removeAudioUrl(candidateId){
+  if(!confirm('この候補者の動画URLを削除しますか？')) return;
+  showNotice('削除中...','info');
+  const res=await fetchGAS({ action:'setAudioUrl', id:candidateId, roundId:state.adminRound, audioUrl:'', driveShareUrl:'' });
+  if(res&&res.success){
+    const round=state.rounds.find(r=>r.id===state.adminRound);
+    if(round) round.candidates=res.data;
+  } else {
+    const round=state.rounds.find(r=>r.id===state.adminRound);
+    if(round){ const c=round.candidates.find(c=>c.id===candidateId); if(c){ c.audioUrl=''; c.driveShareUrl=''; } }
+  }
+  showNotice('削除しました','success');
+  renderAdminAudio();
+}
+
+// ===== CSV出力 =====
+function exportCSV(){
+  if(!state.adminRound) return;
+  const round=state.rounds.find(r=>r.id===state.adminRound);
+  if(!round) return;
+  const total=round.candidates.reduce((s,c)=>s+Number(c.votes||0),0);
+  const sorted=[...round.candidates].sort((a,b)=>Number(b.votes||0)-Number(a.votes||0));
+  const rows=[['ラウンド','順位','アーティスト名','ジャンル','得票数','得票率%']];
+  sorted.forEach((c,i)=>{
+    const pct=total>0?(Number(c.votes||0)/total*100).toFixed(1):'0.0';
+    rows.push([round.name,i+1,c.name,c.genre,c.votes,pct]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='votes_'+round.name+'.csv';
+  a.click();
+}
+
+// ===== 起動 =====
+loadData();
+
+setInterval(()=>{
+  if(document.getElementById('view-results').classList.contains('active')){
+    loadData();
+  }
+}, 30000);
+</script>
+</body>
+</html>
